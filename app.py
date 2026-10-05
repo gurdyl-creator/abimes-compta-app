@@ -2,14 +2,30 @@ import streamlit as st
 import sqlite3
 import random
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- INITIALISATION DE LA BASE DE DONNÉES ---
+# --- SÉCURITÉ NETTOYAGE : SUPPRESSION DE L'ANCIENNE BASE COMPATIBLE ---
+# Si la base de données existe mais qu'elle est bloquée sur l'ancienne structure, 
+# on la supprime pour forcer sa reconstruction propre au premier démarrage.
+if os.path.exists("abimes_compta.db"):
+    try:
+        conn = sqlite3.connect("abimes_compta.db")
+        c = conn.cursor()
+        c.execute("SELECT date_debut FROM sorties LIMIT 1")
+        conn.close()
+    except sqlite3.OperationalError:
+        # Si la colonne n'existe pas, c'est l'ancienne base : on supprime le fichier
+        conn.close()
+        os.remove("abimes_compta.db")
+
+# --- INITIALISATION DE LA BASE DE DONNÉES PROPRE ---
 def initialisation_abimes_db():
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
+    
     c.execute('''CREATE TABLE IF NOT EXISTS config_tarifs (
                     id INTEGER PRIMARY KEY, ik_chauffeur REAL, subv_km_club REAL, 
                     forfait_matos_cadre REAL, assurance_2j REAL, assurance_5j REAL, 
@@ -19,9 +35,17 @@ def initialisation_abimes_db():
         c.execute("INSERT INTO config_tarifs VALUES (1, 0.15, 0.02, 5.00, 7.20, 15.50, 0.25, 0.50, 1.00)")
 
     c.execute('''CREATE TABLE IF NOT EXISTS sorties (
-                    id_sortie TEXT PRIMARY KEY, nom_sortie TEXT, date_debut TEXT, date_fin TEXT, 
-                    lieu_gite TEXT, departements TEXT, cavites TEXT, type_activite TEXT, 
-                    statut TEXT DEFAULT 'En cours', email_responsable TEXT, mot_de_passe_unique TEXT)''')
+                    id_sortie TEXT PRIMARY KEY, 
+                    nom_sortie TEXT, 
+                    date_debut TEXT, 
+                    date_fin TEXT, 
+                    lieu_gite TEXT, 
+                    departements TEXT, 
+                    cavites TEXT, 
+                    type_activite TEXT, 
+                    statut TEXT DEFAULT 'En cours', 
+                    email_responsable TEXT, 
+                    mot_de_passe_unique TEXT)''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS participants (
                     id_participant INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, nom_format TEXT, 
@@ -161,16 +185,3 @@ else:
         c = conn.cursor()
         c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
         res_s = c.fetchone()
-        conn.close()
-        
-        titre_affichage = res_s[0] if res_s else id_sortie
-        st.title(f"📝 Gestion des frais : {titre_affichage}")
-        
-        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
-        
-        with tab_membres:
-            st.subheader("👥 Ajouter une personne présente sur la sortie")
-            with st.form("formulaire_final_participants"):
-                nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
-                email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
-                st.write("---")
