@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import random
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -48,24 +49,37 @@ initialisation_abimes_db()
 def generer_code_pin():
     return ''.join(random.choice('0123456789') for _ in range(6))
 
+# 🌟 DOUBLE SÉCURITÉ SMTP : SSL (465) + TLS (587) AUTOMATIQUE
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
         return False, "Configuration mail manquante dans les Secrets Streamlit."
     config = st.secrets["email"]
+    
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
     corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
+    
+    # Tentative 1 : SSL standard (Port 465)
     try:
-        serveur = smtplib.SMTP_SSL(config["serveur_smtp"], config["port_smtp"])
+        serveur = smtplib.SMTP_SSL(config["serveur_smtp"], int(config.get("port_smtp", 465)), timeout=10)
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
         serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
         serveur.quit()
-        return True, "Email envoyé"
-    except Exception as e:
-        return False, str(e)
+        return True, "Email envoyé via SSL"
+    except Exception:
+        # Tentative 2 de secours : TLS standard (Port 587)
+        try:
+            serveur = smtplib.SMTP(config["serveur_smtp"], 587, timeout=10)
+            serveur.starttls()
+            serveur.login(config["adresse_club"], config["mot_de_passe_club"])
+            serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
+            serveur.quit()
+            return True, "Email envoyé via TLS de secours"
+        except Exception as e_tls:
+            return False, f"Échec SSL et TLS. Détail : {str(e_tls)}"
 
 # --- GESTION DES SESSIONS ---
 if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
@@ -158,7 +172,7 @@ else:
         res_s = c.fetchone()
         conn.close()
         
-        titre_affichage = res_s[0] if res_s else id_sortie
+        titre_affichage = res_s if res_s else id_sortie
         st.title(f"📝 Gestion des frais : {titre_affichage}")
         
         tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
@@ -169,12 +183,3 @@ else:
                 nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
                 email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
                 st.write("---")
-                statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="v_statut")
-                genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, key="v_genre")
-                age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, key="v_age")
-                st.write("---")
-                voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="v_voiture")
-                assurance = "Aucune"
-                matos = False
-                if statut == "Débutant":
-                    st.write("🔧 *Options Débutant*")
