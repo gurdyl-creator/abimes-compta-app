@@ -142,7 +142,7 @@ else:
         d_deb_obj = datetime.today().date()
         d_fin_obj = datetime.today().date()
 
-    # --- CONFIGURATION DU BANDEAU GAUCHE MODIFIABLE ---
+    # --- CONFIGURATION DU BANDEAU GAUCHE ENREGISTRABLE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
@@ -154,7 +154,6 @@ else:
     side_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite, key="side_g")
     side_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps, key="side_dep")
     
-    # 🌟 SÉCURISATION DU SÉLECTEUR : index dynamique blindé contre le plantage si la valeur lue est invalide
     liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
     idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
     side_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut, key="side_t")
@@ -179,7 +178,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # --- ZONE CENTRALE ---
+    # --- ZONE CENTRALE (LIGNE DROITE, AUCUN BLOC IMBRIQUÉ) ---
     st.title(f"📝 Gestion : {s_nom}")
     
     st.markdown("### 👤 Ajouter une personne présente sur la sortie")
