@@ -48,7 +48,7 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
         port = int(config.get("port_smtp", 587))
-        serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=5)
+        serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=3)
         serveur.starttls()
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
         serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
@@ -80,7 +80,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             type_activite = st.selectbox("Type d'activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"])
             lieu_gite = st.text_input("Lieu du gîte :")
             departements = st.text_input("N° Département(s) :")
-            cavites = st.text_area("Liste des cavities :")
+            cavites = st.text_area("Liste des cavités :")
             submit_bouton = st.form_submit_button("🚀 Valider l'espace")
 
         if submit_bouton and nom_sortie and email_responsable:
@@ -92,8 +92,14 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 c.execute('''INSERT INTO sorties (id_sortie, nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite, email_responsable, mot_de_passe_unique) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_sortie, str(date_debut), str(date_fin), lieu_gite, departements, cavites, type_activite, email_responsable, code_pin))
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
+                
+                # 🌟 RESTAURATION STRICTE : Retour de la mise en page aérée
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
+                
+                # 🌟 RESTAURATION DE L'ALERTE : Affichage du message orange si le mail échoue
+                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
+                if not ok_mail:
+                    st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
@@ -123,13 +129,13 @@ else:
     res_s = c.fetchone()
     conn.close()
     
-    s_nom = res_s[0] if res_s else id_sortie
-    s_ddeb = res_s[1] if res_s else str(datetime.today().date())
-    s_dfin = res_s[2] if res_s else str(datetime.today().date())
-    s_gite = res_s[3] if res_s and res_s[3] else ""
-    s_deps = res_s[4] if res_s and res_s[4] else ""
-    s_cavites = res_s[5] if res_s and res_s[5] else ""
-    s_type = res_s[6] if res_s and res_s[6] else "classique"
+    s_nom = res_s if res_s else id_sortie
+    s_ddeb = res_s if res_s else str(datetime.today().date())
+    s_dfin = res_s if res_s else str(datetime.today().date())
+    s_gite = res_s if res_s and res_s else ""
+    s_deps = res_s if res_s and res_s else ""
+    s_cavites = res_s if res_s and res_s else ""
+    s_type = res_s if res_s and res_s else "classique"
 
     try:
         d_deb_obj = datetime.strptime(s_ddeb, "%Y-%m-%d").date()
@@ -138,7 +144,7 @@ else:
         d_deb_obj = datetime.today().date()
         d_fin_obj = datetime.today().date()
 
-    # --- CONFIGURATION DU BANDEAU GAUCHE MODIFIABLE ET ENREGISTRABLE ---
+    # Bandeau gauche modifiable
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
@@ -170,7 +176,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # --- ZONE CENTRALE (ZÉRO BLOC IMBRIQUÉ, EN LIGNE DROITE COMPLÈTE) ---
+    # Zone centrale linéaire
     st.title(f"📝 Gestion : {s_nom}")
     
     st.markdown("### 👤 Ajouter une personne présente sur la sortie")
@@ -179,8 +185,3 @@ else:
     email_part = st.text_input("Adresse Email (Optionnel) :", key="p_email")
     st.write("---")
     statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="p_statut")
-    genre = st.radio("Genre (Optionnel) :", ["Homme", "Femme"], horizontal=True, index=None, key="p_genre")
-    age = st.radio("Tranche d'âge (Optionnel) :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None, key="p_age")
-    st.write("---")
-    voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="p_voiture")
-    
