@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- INITIALISATION DE LA BASE DE DONNÉES D'ORIGINE ---
+# --- INITIALISATION DE LA BASE DE DONNÉES ---
 def initialisation_abimes_db():
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
@@ -46,7 +46,7 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
     
-    corps_texte = f"""Bonjour,\n\nVous venez de créer l'espace de gestion des frais pour la sortie spéléo : {nom_sortie}.\n\nVoici vos identifiants uniques pour vous connecter et enregistrer les dépenses au fil de l'eau :\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès (Chiffres) : {code_pin}\n\nVous pouvez accéder à l'application à tout moment pour ajouter les participants, gîtes, repas et transports.\n\nBonne sortie,\nLe Bureau - Club ABIMES"""
+    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
         port = int(config.get("port_smtp", 587))
@@ -63,7 +63,6 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
 if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
 if "role_utilisateur" not in st.session_state: st.session_state["role_utilisateur"] = None
 if "id_sortie_active" not in st.session_state: st.session_state["id_sortie_active"] = None
-if "mode_edition_barre" not in st.session_state: st.session_state["mode_edition_barre"] = False
 
 st.set_page_config(page_title="ABIMES - Compta", page_icon="🦇", layout="centered")
 
@@ -100,7 +99,6 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
                 
-                # 🌟 REPOSITIONNÉ : La tentative d'envoi s'exécute bien ICI et affiche le message si échec
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
@@ -123,11 +121,11 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 st.rerun()
             else: st.error("❌ Identifiants incorrects.")
 
-# --- ÉCRANS INTÉRIEURS (CONNECTÉ) ---
+# --- ÉCRANS INTÉRIEURS (SI CONNECTÉ) ---
 else:
     id_sortie = st.session_state["id_sortie_active"]
     
-    # Lecture complète en base de données pour alimenter le bandeau
+    # Lecture complète en base de données pour alimenter le bandeau fixe et les formulaires
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
     c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
@@ -135,41 +133,58 @@ else:
     conn.close()
     
     s_nom = res_s[0] if res_s else id_sortie
-    s_ddeb = res_s[1] if res_s else ""
-    s_dfin = res_s[2] if res_s else ""
+    s_ddeb = res_s[1] if res_s else str(datetime.today().date())
+    s_dfin = res_s[2] if res_s else str(datetime.today().date())
     s_gite = res_s[3] if res_s and res_s[3] else "Non renseigné"
     s_deps = res_s[4] if res_s and res_s[4] else "Non renseigné"
     s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # 🌟 RESTAURATION COMPLÈTE DU BANDEAU GAUCHE AVEC DATE, DEP, GITE ET MODIFICATION
+    # 🌟 BANDEAU GAUCHE COMPLET ET FIXE : Aucun bouton bloquant, simple pense-bête fiable
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"👤 Rôle : **{st.session_state['role_utilisateur']}**")
     st.sidebar.write("---")
+    st.sidebar.subheader("📋 Infos actuelles :")
+    st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
+    st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
+    st.sidebar.write(f"⏱️ **Dates :** du {s_ddeb} au {s_dfin}")
+    st.sidebar.write(f"🏡 **Gîte :** {s_gite}")
+    st.sidebar.write(f"🗺️ **Département(s) :** {s_deps}")
+    st.sidebar.write(f"🧗 **Activité :** {s_type}")
+    st.sidebar.write(f"🕳️ **Cavités :**\n{s_cavites}")
+    st.sidebar.write("---")
+    if st.sidebar.button("🚪 Se déconnecter"):
+        st.session_state["statut_connexion"] = "Deconnecte"
+        st.session_state["role_utilisateur"] = None
+        st.session_state["id_sortie_active"] = None
+        st.rerun()
+
+    # Zone centrale
+    st.title(f"📝 Gestion : {s_nom}")
+    tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
     
-    if not st.session_state["mode_edition_barre"]:
-        st.sidebar.subheader("📋 Caractéristiques :")
-        st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
-        st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
-        st.sidebar.write(f"⏱️ **Dates :** du {s_ddeb} au {s_dfin}")
-        st.sidebar.write(f"🏡 **Gîte :** {s_gite}")
-        st.sidebar.write(f"🗺️ **Département(s) :** {s_deps}")
-        st.sidebar.write(f"🧗 **Activité :** {s_type}")
-        st.sidebar.write(f"🕳️ **Cavités :**\n{s_cavites}")
-        st.sidebar.write("---")
-        if st.sidebar.button("⚙️ Modifier les infos"):
-            st.session_state["mode_edition_barre"] = True
-            st.rerun()
-    else:
-        st.sidebar.subheader("⚙️ Modification rapide :")
-        edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom)
-        edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "")
-        edit_deps = st.sidebar.text_input("Département(s) :", value=s_deps if s_deps != "Non renseigné" else "")
-        edit_type = st.sidebar.selectbox("Activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"], index=["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"].index(s_type))
-        edit_cavites = st.sidebar.text_area("Cavités :", value=s_cavites if s_cavites != "Aucune" else "")
+    # --- TAB 1 : LES PARTICIPANTS ---
+    with tab_membres:
+        st.subheader("👥 Ajouter une personne présente sur la sortie")
         
-        c_side1, c_side2 = st.sidebar.columns(2)
-        with c_side1:
-            if st.sidebar.button("💾 Sauver"):
-                conn = sqlite3.connect("abimes_compta.db")
-                c = conn.cursor()
+        with st.form("form_final_participants_secure"):
+            nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N")
+            email_part = st.text_input("Adresse Email (Optionnel) :")
+            st.write("---")
+            statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"])
+            genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, index=None)
+            age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None)
+            st.write("---")
+            voiture = st.checkbox("🚗 Propose sa voiture pour la sortie")
+            
+            assurance = "Aucune"
+            matos = False
+            if statut == "Débutant":
+                st.write("🔧 *Options Débutant*")
+                assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"])
+                matos = st.checkbox("🎒 Prêt de matériel débutant club")
+                
+            st.write("---")
+            bouton_participant = st.form_submit_button("💾 Enregistrer le participant")
+        
+        if bouton_participant:
