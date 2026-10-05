@@ -37,12 +37,14 @@ def generer_code_pin():
 
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
-        return False, "Configuration mail manquante."
+        return False, "Configuration mail manquante dans les Secrets Streamlit."
     config = st.secrets["email"]
+    
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
+    
     corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
@@ -102,9 +104,19 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             try:
                 c.execute('''INSERT INTO sorties (id_sortie, nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite, email_responsable, mot_de_passe_unique) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_sortie, str(date_debut), str(date_fin), lieu_gite, departements, cavites, type_activite, email_responsable, code_pin))
                 conn.commit()
+                
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
-                st.info(f"➡️ **N° de Sortie :** `{id_sortie}`  |  ➡️ **Code PIN :** `{code_pin}`")
-                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
+                
+                # 🌟 RESTAURATION STRICTE : Retour à la mise en page aérée d'origine que vous aimiez
+                st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n"
+                        f"➡️ **N° de Sortie :** `{id_sortie}`\n\n"
+                        f"➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
+                
+                # 🌟 RESTAURATION DU MESSAGE : Affichage de l'alerte orange en cas d'échec du mail
+                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
+                if not ok_mail:
+                    st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
+                    
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
@@ -143,7 +155,7 @@ else:
         
         conn = sqlite3.connect("abimes_compta.db")
         c = conn.cursor()
-        c.execute("SELECT nom_sortie FROM sorties WHERE id_sortie = ?", (id_sortie,))
+        c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
         res_s = c.fetchone()
         conn.close()
         
@@ -175,19 +187,3 @@ else:
                 with container_initiation:
                     st.write("🔧 *Options Débutant*")
                     assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"], key="v_ass")
-                    matos = st.checkbox("🎒 Prêt de matériel débutant club", key="v_matos")
-                
-            st.write("---")
-            bouton_participant = st.button("💾 Enregistrer le participant", key="btn_enregistrer_p")
-            
-            # 🌟 NETTOYAGE ABSOLU : Lignes indépendantes sans cascade imbriquée à risques
-            champs_valides = True
-            
-            if bouton_participant and not nom_part:
-                st.error("⚠️ Le Nom et Prénom sont obligatoires.")
-                champs_valides = False
-                
-            if bouton_participant and genre is None:
-                st.error("⚠️ Veuillez sélectionner le Genre (Homme/Femme).")
-                champs_valides = False
-                
