@@ -92,9 +92,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
-                if not ok_mail:
-                    st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Utilisez les codes écrits ci-dessus pour vous connecter.")
+                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
@@ -118,7 +116,6 @@ if st.session_state["statut_connexion"] == "Deconnecte":
 else:
     id_sortie = st.session_state["id_sortie_active"]
     
-    # 1. Lecture ultra-sécurisée des informations en base de données
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
     c.execute("SELECT nom_sortie, lieu_gite, type_activite, cavites FROM sorties WHERE id_sortie = ?", (id_sortie,))
@@ -130,7 +127,7 @@ else:
     s_type = res_s[2] if res_s and res_s[2] else "classique"
     s_cavites = res_s[3] if res_s and res_s[3] else "Aucune"
 
-    # 2. Construction propre du bandeau de gauche (Sidebar)
+    # Barre latérale gauche
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.markdown(f"""
     **Session active :** `{id_sortie}`
@@ -146,7 +143,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # 3. Affichage de la zone centrale avec le titre et les 3 onglets
+    # Zone centrale
     st.title(f"📝 Gestion : {s_nom}")
     tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
     
@@ -176,16 +173,21 @@ else:
         if bouton_participant:
             if not nom_part:
                 st.error("⚠️ Le Nom et Prénom sont obligatoires.")
-            elif genre is None:
-                st.error("⚠️ Veuillez sélectionner le Genre (Homme/Femme).")
-            elif age is None:
-                st.error("⚠️ Veuillez sélectionner la Tranche d'âge.")
             else:
+                # 🌟 SOUPLESSE : Si le genre ou l'âge n'est pas coché, on enregistre "Non spécifié"
+                genre_texte = genre if genre is not None else "Non spécifié"
+                age_texte = age if age is not None else "Non spécifié"
+                
                 conn = sqlite3.connect("abimes_compta.db")
                 c = conn.cursor()
-                c.execute('''INSERT INTO participants (id_sortie, nom_format, email, statut_speleo, genre, tranche_age, option_assurance, option_matos, propose_voiture) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_part, email_part, statut, genre, age, assurance, 1 if matos else 0, 1 if voiture else 0))
+                c.execute('''INSERT INTO participants (id_sortie, nom_format, email, statut_speleo, genre, tranche_age, option_assurance, option_matos, propose_voiture) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_part, email_part, statut, genre_texte, age_texte, assurance, 1 if matos else 0, 1 if voiture else 0))
                 conn.commit()
                 conn.close()
                 st.success(f"👤 {nom_part} a été correctement enregistré !")
                 st.rerun()
 
+        st.write("---")
+        st.subheader("📋 Liste des personnes enregistrées")
+        conn = sqlite3.connect("abimes_compta.db")
+        c = conn.cursor()
+        c.execute("SELECT nom_format, statut_speleo, genre, tranche_age FROM participants WHERE id_sortie = ?", (id_sortie,))
