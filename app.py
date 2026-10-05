@@ -10,7 +10,6 @@ from datetime import datetime
 def initialisation_abimes_db():
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
-    
     c.execute('''CREATE TABLE IF NOT EXISTS config_tarifs (
                     id INTEGER PRIMARY KEY, ik_chauffeur REAL, subv_km_club REAL, 
                     forfait_matos_cadre REAL, assurance_2j REAL, assurance_5j REAL, 
@@ -165,18 +164,13 @@ else:
         conn.close()
         
         titre_affichage = res_s[0] if res_s else id_sortie
-        st.title(f"📝 {titre_affichage}")
+        st.title(f"📝 Gestion des frais : {titre_affichage}")
         
-        # 🌟 SÉCURISATION RADICALE ICI : Remplacement des onglets complexes par un menu latéral ultra-fiable
-        st.sidebar.write("---")
-        menu_navigation = st.sidebar.radio("📚 Menu de la sortie :", [
-            "👤 Enregistrer les Participants", 
-            "⚙️ Modifier les Infos Sortie", 
-            "🏡 Frais de Gîte / Hébergement"
-        ])
+        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
         
-        # --- MENU 1 : LES PARTICIPANTS ---
-        if menu_navigation == "👤 Enregistrer les Participants":
+        with tab_membres:
             st.subheader("👥 Ajouter une personne présente sur la sortie")
-            
             with st.form("formulaire_final_participants"):
+                nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
+                email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
+                st.write("---")
