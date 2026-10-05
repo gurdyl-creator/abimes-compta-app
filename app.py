@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- INITIALISATION DE LA BASE DE DONNÉES D'ORIGINE ---
+# --- INITIALISATION DE LA BASE DE DONNÉES ---
 def initialisation_abimes_db():
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
@@ -38,13 +38,13 @@ def generer_code_pin():
 
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
-        return False, "Configuration mail manquante dans les Secrets Streamlit."
+        return False, "Configuration mail manquante."
     config = st.secrets["email"]
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
-    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
+    corps_texte = f"Bonjour,\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
         port = int(config.get("port_smtp", 587))
@@ -67,8 +67,6 @@ st.set_page_config(page_title="ABIMES - Compta", page_icon="🦇", layout="cente
 # --- ÉCRAN ACCUEIL ---
 if st.session_state["statut_connexion"] == "Deconnecte":
     st.title("🦇 Club ABIMES - Gestion des Sorties")
-    st.write("Outil open-source de gestion et répartition des frais de week-ends spéléo.")
-
     onglet_creer, onglet_connexion = st.tabs(["🆕 Créer une sortie", "🔑 Connexion"])
 
     with onglet_creer:
@@ -82,7 +80,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             type_activite = st.selectbox("Type d'activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"])
             lieu_gite = st.text_input("Lieu du gîte :")
             departements = st.text_input("N° Département(s) :")
-            cavites = st.text_area("Liste des cavités :")
+            cavites = st.text_area("Liste des cavities :")
             submit_bouton = st.form_submit_button("🚀 Valider l'espace")
 
         if submit_bouton and nom_sortie and email_responsable:
@@ -95,9 +93,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
-                if not ok_mail:
-                    st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
+                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
@@ -135,7 +131,6 @@ else:
     s_cavites = res_s[5] if res_s and res_s[5] else ""
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # Conversion des dates pour les calendriers de la barre latérale
     try:
         d_deb_obj = datetime.strptime(s_ddeb, "%Y-%m-%d").date()
         d_fin_obj = datetime.strptime(s_dfin, "%Y-%m-%d").date()
@@ -143,7 +138,7 @@ else:
         d_deb_obj = datetime.today().date()
         d_fin_obj = datetime.today().date()
 
-    # 🌟 CORRECTION DU BANDEAU GAUCHE : Saisie directe modifiable et enregistrable
+    # --- CONFIGURATION DU BANDEAU GAUCHE MODIFIABLE ET ENREGISTRABLE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
@@ -166,7 +161,6 @@ else:
         c.execute("UPDATE sorties SET nom_sortie=?, date_debut=?, date_fin=?, lieu_gite=?, departements=?, type_activite=?, cavites=? WHERE id_sortie=?", (side_nom, str(side_ddeb), str(side_dfin), side_gite, side_deps, side_type, side_cavites, id_sortie))
         conn.commit()
         conn.close()
-        st.toast("⚙️ Informations mises à jour !", icon="✅")
         st.rerun()
 
     st.sidebar.write("---")
@@ -176,9 +170,17 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # Zone centrale
+    # --- ZONE CENTRALE (ZÉRO BLOC IMBRIQUÉ, EN LIGNE DROITE COMPLÈTE) ---
     st.title(f"📝 Gestion : {s_nom}")
-    tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "📊 Informations globales", "💰 Saisie des Dépenses"])
     
-    # --- TAB 1 : LES PARTICIPANTS (Validation simplifiée et fonctionnelle) ---
-    with tab_membres:
+    st.markdown("### 👤 Ajouter une personne présente sur la sortie")
+    
+    nom_part = st.text_input("Nom et Prénom (Obligatoire) :", placeholder="Format attendu : Prénom N", key="p_nom")
+    email_part = st.text_input("Adresse Email (Optionnel) :", key="p_email")
+    st.write("---")
+    statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="p_statut")
+    genre = st.radio("Genre (Optionnel) :", ["Homme", "Femme"], horizontal=True, index=None, key="p_genre")
+    age = st.radio("Tranche d'âge (Optionnel) :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None, key="p_age")
+    st.write("---")
+    voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="p_voiture")
+    
