@@ -38,7 +38,7 @@ def generer_code_pin():
 
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
-        return False, "Configuration mail manquante dans les Secrets Streamlit."
+        return False, "Configuration mail manquante."
     config = st.secrets["email"]
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
@@ -48,7 +48,6 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
         port = int(config.get("port_smtp", 587))
-        # Limitation stricte à 3 secondes pour éviter le blocage infini du serveur
         serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=3)
         serveur.starttls()
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
@@ -68,8 +67,6 @@ st.set_page_config(page_title="ABIMES - Compta", page_icon="🦇", layout="cente
 # --- ÉCRAN ACCUEIL (DÉCONNECTÉ) ---
 if st.session_state["statut_connexion"] == "Deconnecte":
     st.title("🦇 Club ABIMES - Gestion des Sorties")
-    st.write("Outil open-source de gestion et répartition des frais de week-ends spéléo.")
-
     onglet_creer, onglet_connexion = st.tabs(["🆕 Créer une sortie", "🔑 Connexion"])
 
     with onglet_creer:
@@ -96,7 +93,6 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Utilisez les codes écrits ci-dessus pour vous connecter.")
@@ -137,7 +133,7 @@ else:
     s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # Bandeau gauche fixe (Simple mémo visuel)
+    # Bandeau gauche fixe
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"👤 Rôle : **{st.session_state['role_utilisateur']}**")
     st.sidebar.write("---")
@@ -156,7 +152,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # Zone centrale de l'application
+    # Zone centrale
     st.title(f"📝 Gestion : {s_nom}")
     tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
     
@@ -183,7 +179,10 @@ else:
             st.write("---")
             bouton_participant = st.form_submit_button("💾 Enregistrer le participant")
         
+        # 🌟 LOGIQUE SÉCURISÉE EN LIGNE DROITE : Aucun risque de décalage d'espaces
         if bouton_participant and not nom_part:
             st.error("⚠️ Le Nom et Prénom sont obligatoires.")
             
         if bouton_participant and nom_part:
+            genre_texte = str(genre) if genre is not None else "Non spécifié"
+            age_texte = str(age) if age is not None else "Non spécifié"
