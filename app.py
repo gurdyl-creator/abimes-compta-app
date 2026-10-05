@@ -37,15 +37,13 @@ def generer_code_pin():
 
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
-        return False, "Configuration mail manquante dans les Secrets Streamlit."
+        return False, "Configuration mail manquante."
     config = st.secrets["email"]
-    
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
-    
-    corps_texte = f"""Bonjour,\n\nVous venez de créer l'espace de gestion des frais pour la sortie spéléo : {nom_sortie}.\n\nVoici vos identifiants uniques pour vous connecter et enregistrer les dépenses au fil de l'eau :\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès (Chiffres) : {code_pin}\n\nVous pouvez accéder à l'application à tout moment pour ajouter les participants, gîtes, repas et transports.\n\nBonne sortie,\nLe Bureau - Club ABIMES"""
+    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
         port = int(config.get("port_smtp", 587))
@@ -104,18 +102,9 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             try:
                 c.execute('''INSERT INTO sorties (id_sortie, nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite, email_responsable, mot_de_passe_unique) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_sortie, str(date_debut), str(date_fin), lieu_gite, departements, cavites, type_activite, email_responsable, code_pin))
                 conn.commit()
-                
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
-                st.info(f"🔑 **Notez précieusement vos accès de connexion :**\n\n"
-                        f"➡️ **N° de Sortie :** `{id_sortie}`\n\n"
-                        f"➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                
-                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
-                if ok_mail:
-                    st.toast("📧 Un e-mail de rappel vous a été envoyé !", icon="📩")
-                else:
-                    st.caption(f"💡 *Note : L'e-mail n'a pas pu partir automatiquement ({erreur}). Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.*")
-                    
+                st.info(f"➡️ **N° de Sortie :** `{id_sortie}`  |  ➡️ **Code PIN :** `{code_pin}`")
+                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
@@ -143,7 +132,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                     st.rerun()
                 else: st.error("❌ Identifiants incorrects.")
 
-# --- ÉCRANS INTÉRIEURS (CONNECTÉ) ---
+# --- ÉCRANS INTÉRIEURS ---
 else:
     if st.session_state["role_utilisateur"] == "Administrateur":
         st.title("🛡️ Espace Admin")
@@ -160,22 +149,42 @@ else:
         
         titre_affichage = res_s[0] if res_s else id_sortie
         st.title(f"📝 Gestion des frais : {titre_affichage}")
-        st.caption(f"Session active : `{id_sortie}`")
         
-        # 🌟 RECONSTRUCTION ICI : Les 3 onglets officiels du responsable terrain
         tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
         
         with tab_membres:
             st.subheader("👥 Ajouter une personne présente sur la sortie")
             
-            with st.form("form_ajouter_participant"):
-                nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
-                email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
-                st.write("---")
-                statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="v_statut")
-                genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, key="v_genre")
-                age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, key="v_age")
-                st.write("---")
-                voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="v_voiture")
+            nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
+            email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
+            
+            st.write("---")
+            # Utilisation de la réactivité native sans blocage
+            statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="v_statut")
+            
+            genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, index=None, key="v_genre")
+            age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None, key="v_age")
+            
+            st.write("---")
+            voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="v_voiture")
+            
+            # 🌟 INTERFACE DYNAMIQUE SÉCURISÉE : Conteneur isolé pour l'affichage conditionnel
+            container_initiation = st.container()
+            assurance = "Aucune"
+            matos = False
+            
+            if statut == "Débutant":
+                with container_initiation:
+                    st.write("🔧 *Options Débutant*")
+                    assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"], key="v_ass")
+                    matos = st.checkbox("🎒 Prêt de matériel débutant club", key="v_matos")
                 
-                # Options d'initiation (Masquées par défaut, s'affichent uniquement pour le statut Débutant)
+            st.write("---")
+            bouton_participant = st.button("💾 Enregistrer le participant", key="btn_enregistrer_p")
+            
+            if bouton_participant:
+                if not nom_part:
+                    st.error("⚠️ Le Nom et Prénom sont obligatoires.")
+                elif genre is None:
+                    st.error("⚠️ Veuillez sélectionner le Genre (Homme/Femme).")
+                elif age is None:
