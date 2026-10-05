@@ -35,7 +35,6 @@ initialisation_abimes_db()
 def generer_code_pin():
     return ''.join(random.choice('0123456789') for _ in range(6))
 
-# 🌟 ENVOI PROTOCOLE INTERMÉDIAIRE TLS (Plus robuste pour les serveurs distants)
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
         return False, "Configuration mail manquante dans les Secrets Streamlit."
@@ -46,14 +45,12 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
     
-    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
+    corps_texte = f"""Bonjour,\n\nVous venez de créer l'espace de gestion des frais pour la sortie spéléo : {nom_sortie}.\n\nVoici vos identifiants uniques pour vous connecter et enregistrer les dépenses au fil de l'eau :\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès (Chiffres) : {code_pin}\n\nVous pouvez accéder à l'application à tout moment pour ajouter les participants, gîtes, repas et transports.\n\nBonne sortie,\nLe Bureau - Club ABIMES"""
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
-    
     try:
-        # Connexion en mode TLS (Port 587 ou port configuré) pour s'affranchir des blocages SSL géographiques
         port = int(config.get("port_smtp", 587))
-        serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=10)
-        serveur.starttls() # Activation de la sécurité après connexion
+        serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=5)
+        serveur.starttls()
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
         serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
         serveur.quit()
@@ -146,12 +143,39 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                     st.rerun()
                 else: st.error("❌ Identifiants incorrects.")
 
-# --- ÉCRANS INTÉRIEURS ---
+# --- ÉCRANS INTÉRIEURS (CONNECTÉ) ---
 else:
     if st.session_state["role_utilisateur"] == "Administrateur":
         st.title("🛡️ Espace Admin")
         st.write("Bienvenue.")
         
     elif st.session_state["role_utilisateur"] == "Responsable Sortie":
-        st.title("📝 Espace Responsable - Saisie terrain")
-        st.write(f"Session active : `{st.session_state['id_sortie_active']}`")
+        id_sortie = st.session_state["id_sortie_active"]
+        
+        conn = sqlite3.connect("abimes_compta.db")
+        c = conn.cursor()
+        c.execute("SELECT nom_sortie FROM sorties WHERE id_sortie = ?", (id_sortie,))
+        res_s = c.fetchone()
+        conn.close()
+        
+        titre_affichage = res_s[0] if res_s else id_sortie
+        st.title(f"📝 Gestion des frais : {titre_affichage}")
+        st.caption(f"Session active : `{id_sortie}`")
+        
+        # 🌟 RECONSTRUCTION ICI : Les 3 onglets officiels du responsable terrain
+        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
+        
+        with tab_membres:
+            st.subheader("👥 Ajouter une personne présente sur la sortie")
+            
+            with st.form("form_ajouter_participant"):
+                nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
+                email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
+                st.write("---")
+                statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="v_statut")
+                genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, key="v_genre")
+                age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, key="v_age")
+                st.write("---")
+                voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="v_voiture")
+                
+                # Options d'initiation (Masquées par défaut, s'affichent uniquement pour le statut Débutant)
