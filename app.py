@@ -2,30 +2,18 @@ import streamlit as st
 import sqlite3
 import random
 import smtplib
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- SÉCURITÉ NETTOYAGE : SUPPRESSION DE L'ANCIENNE BASE COMPATIBLE ---
-# Si la base de données existe mais qu'elle est bloquée sur l'ancienne structure, 
-# on la supprime pour forcer sa reconstruction propre au premier démarrage.
-if os.path.exists("abimes_compta.db"):
-    try:
-        conn = sqlite3.connect("abimes_compta.db")
-        c = conn.cursor()
-        c.execute("SELECT date_debut FROM sorties LIMIT 1")
-        conn.close()
-    except sqlite3.OperationalError:
-        # Si la colonne n'existe pas, c'est l'ancienne base : on supprime le fichier
-        conn.close()
-        os.remove("abimes_compta.db")
+# 🌟 MODIFICATION RADICALE : Utilisation d'un nouveau nom de fichier pour contourner le verrou du serveur
+DB_NAME = "abimes_compta_v2.db"
 
-# --- INITIALISATION DE LA BASE DE DONNÉES PROPRE ---
 def initialisation_abimes_db():
-    conn = sqlite3.connect("abimes_compta.db")
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
+    # Table des configurations/tarifs
     c.execute('''CREATE TABLE IF NOT EXISTS config_tarifs (
                     id INTEGER PRIMARY KEY, ik_chauffeur REAL, subv_km_club REAL, 
                     forfait_matos_cadre REAL, assurance_2j REAL, assurance_5j REAL, 
@@ -34,6 +22,7 @@ def initialisation_abimes_db():
     if c.fetchone() == 0:
         c.execute("INSERT INTO config_tarifs VALUES (1, 0.15, 0.02, 5.00, 7.20, 15.50, 0.25, 0.50, 1.00)")
 
+    # Table des sorties
     c.execute('''CREATE TABLE IF NOT EXISTS sorties (
                     id_sortie TEXT PRIMARY KEY, 
                     nom_sortie TEXT, 
@@ -47,17 +36,20 @@ def initialisation_abimes_db():
                     email_responsable TEXT, 
                     mot_de_passe_unique TEXT)''')
 
+    # Table des participants
     c.execute('''CREATE TABLE IF NOT EXISTS participants (
                     id_participant INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, nom_format TEXT, 
                     email TEXT, statut_speleo TEXT, genre TEXT, tranche_age TEXT, 
                     option_assurance TEXT DEFAULT 'Aucune', option_matos INTEGER DEFAULT 0, 
                     propose_voiture INTEGER DEFAULT 0, statut_vote TEXT DEFAULT 'En attente', commentaire_vote TEXT)''')
 
+    # Table des nuitées
     c.execute('''CREATE TABLE IF NOT EXISTS nuitees (
                     id_nuitee INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_participant INTEGER, nb_nuits INTEGER,
                     FOREIGN KEY(id_sortie) REFERENCES sorties(id_sortie) ON DELETE CASCADE,
                     FOREIGN KEY(id_participant) REFERENCES participants(id_participant) ON DELETE CASCADE)''')
 
+    # Table des dépenses
     c.execute('''CREATE TABLE IF NOT EXISTS depenses (
                     id_depense INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_acheteur INTEGER, montant REAL,
                     code_compta TEXT, intitule TEXT, photo_ticket_path TEXT, imputation_type TEXT DEFAULT 'Collectif', liste_beneficiaires TEXT,
@@ -65,6 +57,7 @@ def initialisation_abimes_db():
     conn.commit()
     conn.close()
 
+# Lancement propre de la base de données v2
 initialisation_abimes_db()
 
 def generer_code_pin():
@@ -133,7 +126,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
 
         if submit_bouton:
             if nom_sortie and email_responsable:
-                conn = sqlite3.connect("abimes_compta.db")
+                conn = sqlite3.connect(DB_NAME)
                 c = conn.cursor()
                 id_sortie = f"ABIMES-{date_debut.year}-S{random.randint(100, 999)}"
                 code_pin = generer_code_pin()
@@ -160,7 +153,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                     st.rerun()
                 else: st.error("❌ Mot de passe Admin incorrect.")
             else:
-                conn = sqlite3.connect("abimes_compta.db")
+                conn = sqlite3.connect(DB_NAME)
                 c = conn.cursor()
                 c.execute("SELECT nom_sortie FROM sorties WHERE id_sortie = ? AND mot_de_passe_unique = ?", (login_id.strip(), login_mdp.strip()))
                 res = c.fetchone()
@@ -181,7 +174,16 @@ else:
     elif st.session_state["role_utilisateur"] == "Responsable Sortie":
         id_sortie = st.session_state["id_sortie_active"]
         
-        conn = sqlite3.connect("abimes_compta.db")
+        conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
         c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
         res_s = c.fetchone()
+        conn.close()
+        
+        titre_affichage = res_s if res_s else id_sortie
+        st.title(f"📝 Gestion des frais : {titre_affichage}")
+        
+        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
+        
+        # --- TAB 1 : LES PARTICIPANTS ---
+        with tab_membres:
