@@ -147,7 +147,7 @@ else:
         res_s = c.fetchone()
         conn.close()
         
-        titre_affichage = res_s[0] if res_s else id_sortie
+        titre_affichage = res_s if res_s else id_sortie
         st.title(f"📝 Gestion des frais : {titre_affichage}")
         
         tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
@@ -159,7 +159,6 @@ else:
             email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
             
             st.write("---")
-            # Utilisation de la réactivité native sans blocage
             statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"], key="v_statut")
             
             genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, index=None, key="v_genre")
@@ -168,7 +167,6 @@ else:
             st.write("---")
             voiture = st.checkbox("🚗 Propose sa voiture pour la sortie", key="v_voiture")
             
-            # 🌟 INTERFACE DYNAMIQUE SÉCURISÉE : Conteneur isolé pour l'affichage conditionnel
             container_initiation = st.container()
             assurance = "Aucune"
             matos = False
@@ -182,9 +180,14 @@ else:
             st.write("---")
             bouton_participant = st.button("💾 Enregistrer le participant", key="btn_enregistrer_p")
             
-            if bouton_participant:
-                if not nom_part:
-                    st.error("⚠️ Le Nom et Prénom sont obligatoires.")
-                elif genre is None:
-                    st.error("⚠️ Veuillez sélectionner le Genre (Homme/Femme).")
-                elif age is None:
+            # 🌟 NETTOYAGE ABSOLU : Lignes indépendantes sans cascade imbriquée à risques
+            champs_valides = True
+            
+            if bouton_participant and not nom_part:
+                st.error("⚠️ Le Nom et Prénom sont obligatoires.")
+                champs_valides = False
+                
+            if bouton_participant and genre is None:
+                st.error("⚠️ Veuillez sélectionner le Genre (Homme/Femme).")
+                champs_valides = False
+                
