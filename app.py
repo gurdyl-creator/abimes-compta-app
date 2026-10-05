@@ -98,10 +98,8 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             try:
                 c.execute('''INSERT INTO sorties (id_sortie, nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite, email_responsable, mot_de_passe_unique) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_sortie, str(date_debut), str(date_fin), lieu_gite, departements, cavites, type_activite, email_responsable, code_pin))
                 conn.commit()
-                
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
@@ -145,7 +143,7 @@ else:
     s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # Bandeau gauche fixe (Simple mémo visuel)
+    # Bandeau gauche fixe
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"👤 Rôle : **{st.session_state['role_utilisateur']}**")
     st.sidebar.write("---")
@@ -164,7 +162,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # Zone centrale de l'application
+    # Zone centrale
     st.title(f"📝 Gestion : {s_nom}")
     tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
     
@@ -190,7 +188,7 @@ else:
         st.write("---")
         bouton_participant = st.button("💾 Enregistrer le participant")
         
-        if bouton_participant:
-            if not nom_part:
-                st.error("⚠️ Le Nom et Prénom sont obligatoires.")
-            else:
+        if bouton_participant and not nom_part:
+            st.error("⚠️ Le Nom et Prénom sont obligatoires.")
+            
+        if bouton_participant and nom_part:
