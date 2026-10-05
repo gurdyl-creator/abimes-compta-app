@@ -6,12 +6,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- INITIALISATION DE LA BASE DE DONNÉES (ALIGNÉE À 100% AVEC LES FORMULAIRES) ---
+# --- INITIALISATION DE LA BASE DE DONNÉES ---
 def initialisation_abimes_db():
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
     
-    # Table des configurations/tarifs
     c.execute('''CREATE TABLE IF NOT EXISTS config_tarifs (
                     id INTEGER PRIMARY KEY, ik_chauffeur REAL, subv_km_club REAL, 
                     forfait_matos_cadre REAL, assurance_2j REAL, assurance_5j REAL, 
@@ -20,34 +19,22 @@ def initialisation_abimes_db():
     if c.fetchone() == 0:
         c.execute("INSERT INTO config_tarifs VALUES (1, 0.15, 0.02, 5.00, 7.20, 15.50, 0.25, 0.50, 1.00)")
 
-    # 🌟 CORRECTION COMPLÈTE ICI : Toutes les colonnes indispensables sont présentes dans la table sorties
     c.execute('''CREATE TABLE IF NOT EXISTS sorties (
-                    id_sortie TEXT PRIMARY KEY, 
-                    nom_sortie TEXT, 
-                    date_debut TEXT, 
-                    date_fin TEXT, 
-                    lieu_gite TEXT, 
-                    departements TEXT, 
-                    cavites TEXT, 
-                    type_activite TEXT, 
-                    statut TEXT DEFAULT 'En cours', 
-                    email_responsable TEXT, 
-                    mot_de_passe_unique TEXT)''')
+                    id_sortie TEXT PRIMARY KEY, nom_sortie TEXT, date_debut TEXT, date_fin TEXT, 
+                    lieu_gite TEXT, departements TEXT, cavites TEXT, type_activite TEXT, 
+                    statut TEXT DEFAULT 'En cours', email_responsable TEXT, mot_de_passe_unique TEXT)''')
 
-    # Table des participants
     c.execute('''CREATE TABLE IF NOT EXISTS participants (
                     id_participant INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, nom_format TEXT, 
                     email TEXT, statut_speleo TEXT, genre TEXT, tranche_age TEXT, 
                     option_assurance TEXT DEFAULT 'Aucune', option_matos INTEGER DEFAULT 0, 
                     propose_voiture INTEGER DEFAULT 0, statut_vote TEXT DEFAULT 'En attente', commentaire_vote TEXT)''')
 
-    # Table des nuitées
     c.execute('''CREATE TABLE IF NOT EXISTS nuitees (
                     id_nuitee INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_participant INTEGER, nb_nuits INTEGER,
                     FOREIGN KEY(id_sortie) REFERENCES sorties(id_sortie) ON DELETE CASCADE,
                     FOREIGN KEY(id_participant) REFERENCES participants(id_participant) ON DELETE CASCADE)''')
 
-    # Table des dépenses
     c.execute('''CREATE TABLE IF NOT EXISTS depenses (
                     id_depense INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_acheteur INTEGER, montant REAL,
                     code_compta TEXT, intitule TEXT, photo_ticket_path TEXT, imputation_type TEXT DEFAULT 'Collectif', liste_beneficiaires TEXT,
@@ -178,9 +165,18 @@ else:
         conn.close()
         
         titre_affichage = res_s[0] if res_s else id_sortie
-        st.title(f"📝 Gestion des frais : {titre_affichage}")
+        st.title(f"📝 {titre_affichage}")
         
-        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
+        # 🌟 SÉCURISATION RADICALE ICI : Remplacement des onglets complexes par un menu latéral ultra-fiable
+        st.sidebar.write("---")
+        menu_navigation = st.sidebar.radio("📚 Menu de la sortie :", [
+            "👤 Enregistrer les Participants", 
+            "⚙️ Modifier les Infos Sortie", 
+            "🏡 Frais de Gîte / Hébergement"
+        ])
         
-        # --- TAB 1 : LES PARTICIPANTS ---
-        with tab_membres:
+        # --- MENU 1 : LES PARTICIPANTS ---
+        if menu_navigation == "👤 Enregistrer les Participants":
+            st.subheader("👥 Ajouter une personne présente sur la sortie")
+            
+            with st.form("formulaire_final_participants"):
