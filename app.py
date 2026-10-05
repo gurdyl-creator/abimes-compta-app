@@ -40,12 +40,10 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
         return False, "Configuration mail manquante dans les Secrets Streamlit."
     config = st.secrets["email"]
-    
     msg = MIMEMultipart()
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
-    
     corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
@@ -60,9 +58,12 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
         return False, str(e)
 
 # --- GESTION DES SESSIONS ---
-if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
-if "role_utilisateur" not in st.session_state: st.session_state["role_utilisateur"] = None
-if "id_sortie_active" not in st.session_state: st.session_state["id_sortie_active"] = None
+if "statut_connexion" not in st.session_state: 
+    st.session_state["statut_connexion"] = "Deconnecte"
+if "role_utilisateur" not in st.session_state: 
+    st.session_state["role_utilisateur"] = None
+if "id_sortie_active" not in st.session_state: 
+    st.session_state["id_sortie_active"] = None
 
 st.set_page_config(page_title="ABIMES - Compta", page_icon="🦇", layout="centered")
 
@@ -79,8 +80,10 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             email_responsable = st.text_input("Adresse email du responsable (Obligatoire) :")
             st.write("---")
             col1, col2 = st.columns(2)
-            with col1: date_debut = st.date_input("Date de début :")
-            with col2: date_fin = st.date_input("Date de fin :")
+            with col1: 
+                date_debut = st.date_input("Date de début :")
+            with col2: 
+                date_fin = st.date_input("Date de fin :")
             type_activite = st.selectbox("Type d'activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"])
             lieu_gite = st.text_input("Lieu du gîte :")
             departements = st.text_input("N° Département(s) :")
@@ -102,8 +105,10 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
-            except sqlite3.IntegrityError: st.error("Erreur de doublon.")
-            finally: conn.close()
+            except sqlite3.IntegrityError: 
+                st.error("Erreur de doublon.")
+            finally: 
+                conn.close()
 
     with onglet_connexion:
         login_id = st.text_input("N° de Sortie :")
@@ -119,13 +124,13 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 st.session_state["role_utilisateur"] = "Responsable Sortie"
                 st.session_state["id_sortie_active"] = login_id.strip()
                 st.rerun()
-            else: st.error("❌ Identifiants incorrects.")
+            else: 
+                st.error("❌ Identifiants incorrects.")
 
-# --- ÉCRANS INTÉRIEURS (SI CONNECTÉ) ---
+# --- ÉCRANS INTÉRIEURS (CONNECTÉ) ---
 else:
     id_sortie = st.session_state["id_sortie_active"]
     
-    # Lecture complète en base de données pour alimenter le bandeau fixe et les formulaires
     conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
     c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
@@ -140,11 +145,11 @@ else:
     s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # 🌟 BANDEAU GAUCHE COMPLET ET FIXE : Aucun bouton bloquant, simple pense-bête fiable
+    # Bandeau gauche fixe (Simple mémo visuel)
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"👤 Rôle : **{st.session_state['role_utilisateur']}**")
     st.sidebar.write("---")
-    st.sidebar.subheader("📋 Infos actuelles :")
+    st.sidebar.subheader("📋 Infos de la sortie :")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
     st.sidebar.write(f"⏱️ **Dates :** du {s_ddeb} au {s_dfin}")
@@ -159,32 +164,33 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # Zone centrale
+    # Zone centrale de l'application
     st.title(f"📝 Gestion : {s_nom}")
     tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
     
-    # --- TAB 1 : LES PARTICIPANTS ---
     with tab_membres:
         st.subheader("👥 Ajouter une personne présente sur la sortie")
         
-        with st.form("form_final_participants_secure"):
-            nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N")
-            email_part = st.text_input("Adresse Email (Optionnel) :")
-            st.write("---")
-            statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"])
-            genre = st.radio("Genre :", ["Homme", "Femme"], horizontal=True, index=None)
-            age = st.radio("Tranche d'âge :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None)
-            st.write("---")
-            voiture = st.checkbox("🚗 Propose sa voiture pour la sortie")
+        nom_part = st.text_input("Nom et Prénom (Obligatoire) :", placeholder="Format attendu : Prénom N")
+        email_part = st.text_input("Adresse Email (Optionnel) :")
+        st.write("---")
+        statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"])
+        genre = st.radio("Genre (Optionnel) :", ["Homme", "Femme"], horizontal=True, index=None)
+        age = st.radio("Tranche d'âge (Optionnel) :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None)
+        st.write("---")
+        voiture = st.checkbox("🚗 Propose sa voiture pour la sortie")
+        
+        assurance = "Aucune"
+        matos = False
+        if statut == "Débutant":
+            st.write("🔧 *Options Débutant*")
+            assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"])
+            matos = st.checkbox("🎒 Prêt de matériel débutant club")
             
-            assurance = "Aucune"
-            matos = False
-            if statut == "Débutant":
-                st.write("🔧 *Options Débutant*")
-                assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"])
-                matos = st.checkbox("🎒 Prêt de matériel débutant club")
-                
-            st.write("---")
-            bouton_participant = st.form_submit_button("💾 Enregistrer le participant")
+        st.write("---")
+        bouton_participant = st.button("💾 Enregistrer le participant")
         
         if bouton_participant:
+            if not nom_part:
+                st.error("⚠️ Le Nom et Prénom sont obligatoires.")
+            else:
