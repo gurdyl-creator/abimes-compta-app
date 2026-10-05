@@ -35,6 +35,7 @@ initialisation_abimes_db()
 def generer_code_pin():
     return ''.join(random.choice('0123456789') for _ in range(6))
 
+# 🌟 ENVOI PROTOCOLE INTERMÉDIAIRE TLS (Plus robuste pour les serveurs distants)
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
         return False, "Configuration mail manquante dans les Secrets Streamlit."
@@ -45,10 +46,14 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
     
-    corps_texte = f"""Bonjour,\n\nVous venez de créer l'espace de gestion des frais pour la sortie spéléo : {nom_sortie}.\n\nVoici vos identifiants uniques pour vous connecter et enregistrer les dépenses au fil de l'eau :\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès (Chiffres) : {code_pin}\n\nVous pouvez accéder à l'application à tout moment pour ajouter les participants, gîtes, repas et transports.\n\nBonne sortie,\nLe Bureau - Club ABIMES"""
+    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
     msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
+    
     try:
-        serveur = smtplib.SMTP_SSL(config["serveur_smtp"], int(config["port_smtp"]))
+        # Connexion en mode TLS (Port 587 ou port configuré) pour s'affranchir des blocages SSL géographiques
+        port = int(config.get("port_smtp", 587))
+        serveur = smtplib.SMTP(config["serveur_smtp"], port, timeout=10)
+        serveur.starttls() # Activation de la sécurité après connexion
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
         serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
         serveur.quit()
@@ -102,9 +107,18 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             try:
                 c.execute('''INSERT INTO sorties (id_sortie, nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite, email_responsable, mot_de_passe_unique) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (id_sortie, nom_sortie, str(date_debut), str(date_fin), lieu_gite, departements, cavites, type_activite, email_responsable, code_pin))
                 conn.commit()
-                st.success("🎉 Sortie créée !")
-                envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
-                st.info(f"➡️ **N° de Sortie :** `{id_sortie}`  |  ➡️ **Code PIN :** `{code_pin}`")
+                
+                st.success("🎉 Votre espace de sortie a été créé avec succès !")
+                st.info(f"🔑 **Notez précieusement vos accès de connexion :**\n\n"
+                        f"➡️ **N° de Sortie :** `{id_sortie}`\n\n"
+                        f"➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
+                
+                ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
+                if ok_mail:
+                    st.toast("📧 Un e-mail de rappel vous a été envoyé !", icon="📩")
+                else:
+                    st.caption(f"💡 *Note : L'e-mail n'a pas pu partir automatiquement ({erreur}). Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.*")
+                    
             except sqlite3.IntegrityError: st.error("Erreur de doublon.")
             finally: conn.close()
 
