@@ -2,16 +2,12 @@ import streamlit as st
 import sqlite3
 import random
 import smtplib
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
 
-# --- INITIALISATION DE LA BASE DE DONNÉES SÉCURISÉE ---
-DB_NAME = "abimes_compta_v3.db"
-
+# --- INITIALISATION DE LA BASE DE DONNÉES D'ORIGINE ---
 def initialisation_abimes_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("abimes_compta.db")
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS config_tarifs (
                     id INTEGER PRIMARY KEY, ik_chauffeur REAL, subv_km_club REAL, 
@@ -31,16 +27,6 @@ def initialisation_abimes_db():
                     email TEXT, statut_speleo TEXT, genre TEXT, tranche_age TEXT, 
                     option_assurance TEXT DEFAULT 'Aucune', option_matos INTEGER DEFAULT 0, 
                     propose_voiture INTEGER DEFAULT 0, statut_vote TEXT DEFAULT 'En attente', commentaire_vote TEXT)''')
-
-    c.execute('''CREATE TABLE IF NOT EXISTS nuitees (
-                    id_nuitee INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_participant INTEGER, nb_nuits INTEGER,
-                    FOREIGN KEY(id_sortie) REFERENCES sorties(id_sortie) ON DELETE CASCADE,
-                    FOREIGN KEY(id_participant) REFERENCES participants(id_participant) ON DELETE CASCADE)''')
-
-    c.execute('''CREATE TABLE IF NOT EXISTS depenses (
-                    id_depense INTEGER PRIMARY KEY AUTOINCREMENT, id_sortie TEXT, id_acheteur INTEGER, montant REAL,
-                    code_compta TEXT, intitule TEXT, photo_ticket_path TEXT, imputation_type TEXT DEFAULT 'Collectif', liste_beneficiaires TEXT,
-                    FOREIGN KEY(id_sortie) REFERENCES sorties(id_sortie) ON DELETE CASCADE)''')
     conn.commit()
     conn.close()
 
@@ -49,7 +35,6 @@ initialisation_abimes_db()
 def generer_code_pin():
     return ''.join(random.choice('0123456789') for _ in range(6))
 
-# 🌟 DOUBLE SÉCURITÉ SMTP : SSL (465) + TLS (587) AUTOMATIQUE
 def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     if "email" not in st.secrets:
         return False, "Configuration mail manquante dans les Secrets Streamlit."
@@ -59,27 +44,17 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
     msg['From'] = config["adresse_club"]
     msg['To'] = email_destinataire
     msg['Subject'] = f"🦇 ABIMES - Vos accès pour la sortie : {nom_sortie}"
-    corps_texte = f"Bonjour,\n\nEspace créé pour la sortie : {nom_sortie}.\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès : {code_pin}"
-    msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     
-    # Tentative 1 : SSL standard (Port 465)
+    corps_texte = f"""Bonjour,\n\nVous venez de créer l'espace de gestion des frais pour la sortie spéléo : {nom_sortie}.\n\nVoici vos identifiants uniques pour vous connecter et enregistrer les dépenses au fil de l'eau :\n\n➡️ Numéro de Sortie : {id_sortie}\n➡️ Code PIN d'accès (Chiffres) : {code_pin}\n\nVous pouvez accéder à l'application à tout moment pour ajouter les participants, gîtes, repas et transports.\n\nBonne sortie,\nLe Bureau - Club ABIMES"""
+    msg.attach(MIMEText(corps_texte, 'plain', 'utf-8'))
     try:
-        serveur = smtplib.SMTP_SSL(config["serveur_smtp"], int(config.get("port_smtp", 465)), timeout=10)
+        serveur = smtplib.SMTP_SSL(config["serveur_smtp"], int(config["port_smtp"]))
         serveur.login(config["adresse_club"], config["mot_de_passe_club"])
         serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
         serveur.quit()
-        return True, "Email envoyé via SSL"
-    except Exception:
-        # Tentative 2 de secours : TLS standard (Port 587)
-        try:
-            serveur = smtplib.SMTP(config["serveur_smtp"], 587, timeout=10)
-            serveur.starttls()
-            serveur.login(config["adresse_club"], config["mot_de_passe_club"])
-            serveur.sendmail(config["adresse_club"], email_destinataire, msg.as_string())
-            serveur.quit()
-            return True, "Email envoyé via TLS de secours"
-        except Exception as e_tls:
-            return False, f"Échec SSL et TLS. Détail : {str(e_tls)}"
+        return True, "Email envoyé"
+    except Exception as e:
+        return False, str(e)
 
 # --- GESTION DES SESSIONS ---
 if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
@@ -92,8 +67,6 @@ st.set_page_config(page_title="ABIMES - Compta", page_icon="🦇", layout="cente
 if st.session_state["statut_connexion"] == "Connecte":
     st.sidebar.title("🦇 ABIMES")
     st.sidebar.write(f"👤 **{st.session_state['role_utilisateur']}**")
-    if st.session_state["id_sortie_active"]:
-        st.sidebar.info(f"Sortie : `{st.session_state['id_sortie_active']}`")
     if st.sidebar.button("🚪 Se déconnecter"):
         st.session_state["statut_connexion"] = "Deconnecte"
         st.session_state["role_utilisateur"] = None
@@ -103,6 +76,8 @@ if st.session_state["statut_connexion"] == "Connecte":
 # --- ÉCRAN ACCUEIL ---
 if st.session_state["statut_connexion"] == "Deconnecte":
     st.title("🦇 Club ABIMES - Gestion des Sorties")
+    st.write("Outil open-source de gestion et répartition des frais de week-ends spéléo.")
+
     onglet_creer, onglet_connexion = st.tabs(["🆕 Créer une sortie", "🔑 Connexion"])
 
     with onglet_creer:
@@ -120,7 +95,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             submit_bouton = st.form_submit_button("🚀 Valider l'espace")
 
         if submit_bouton and nom_sortie and email_responsable:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect("abimes_compta.db")
             c = conn.cursor()
             id_sortie = f"ABIMES-{date_debut.year}-S{random.randint(100, 999)}"
             code_pin = generer_code_pin()
@@ -145,7 +120,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                     st.rerun()
                 else: st.error("❌ Mot de passe Admin incorrect.")
             else:
-                conn = sqlite3.connect(DB_NAME)
+                conn = sqlite3.connect("abimes_compta.db")
                 c = conn.cursor()
                 c.execute("SELECT nom_sortie FROM sorties WHERE id_sortie = ? AND mot_de_passe_unique = ?", (login_id.strip(), login_mdp.strip()))
                 res = c.fetchone()
@@ -160,26 +135,9 @@ if st.session_state["statut_connexion"] == "Deconnecte":
 # --- ÉCRANS INTÉRIEURS ---
 else:
     if st.session_state["role_utilisateur"] == "Administrateur":
-        st.title("🛡️ Espace Administrateur")
-        st.info("Espace trésorier en construction.")
+        st.title("🛡️ Espace Admin")
+        st.write("Bienvenue.")
         
     elif st.session_state["role_utilisateur"] == "Responsable Sortie":
-        id_sortie = st.session_state["id_sortie_active"]
-        
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("SELECT nom_sortie, date_debut, date_fin, lieu_gite, departements, cavites, type_activite FROM sorties WHERE id_sortie = ?", (id_sortie,))
-        res_s = c.fetchone()
-        conn.close()
-        
-        titre_affichage = res_s if res_s else id_sortie
-        st.title(f"📝 Gestion des frais : {titre_affichage}")
-        
-        tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
-        
-        with tab_membres:
-            st.subheader("👥 Ajouter une personne présente sur la sortie")
-            with st.form("formulaire_final_participants"):
-                nom_part = st.text_input("Nom et Prénom :", placeholder="Format attendu : Prénom N", key="v_nom_part")
-                email_part = st.text_input("Adresse Email (Optionnel) :", key="v_email_part")
-                st.write("---")
+        st.title("📝 Espace Responsable - Saisie terrain")
+        st.write(f"Session active : `{st.session_state['id_sortie_active']}`")
