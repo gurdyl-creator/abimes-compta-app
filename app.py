@@ -93,10 +93,8 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 
-                # 🌟 RESTAURATION STRICTE : Retour de la mise en page aérée
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
                 
-                # 🌟 RESTAURATION DE L'ALERTE : Affichage du message orange si le mail échoue
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
@@ -129,13 +127,13 @@ else:
     res_s = c.fetchone()
     conn.close()
     
-    s_nom = res_s if res_s else id_sortie
-    s_ddeb = res_s if res_s else str(datetime.today().date())
-    s_dfin = res_s if res_s else str(datetime.today().date())
-    s_gite = res_s if res_s and res_s else ""
-    s_deps = res_s if res_s and res_s else ""
-    s_cavites = res_s if res_s and res_s else ""
-    s_type = res_s if res_s and res_s else "classique"
+    s_nom = res_s[0] if res_s and res_s[0] else id_sortie
+    s_ddeb = res_s[1] if res_s and res_s[1] else str(datetime.today().date())
+    s_dfin = res_s[2] if res_s and res_s[2] else str(datetime.today().date())
+    s_gite = res_s[3] if res_s and res_s[3] else ""
+    s_deps = res_s[4] if res_s and res_s[4] else ""
+    s_cavites = res_s[5] if res_s and res_s[5] else ""
+    s_type = res_s[6] if res_s and res_s[6] else "classique"
 
     try:
         d_deb_obj = datetime.strptime(s_ddeb, "%Y-%m-%d").date()
@@ -144,7 +142,7 @@ else:
         d_deb_obj = datetime.today().date()
         d_fin_obj = datetime.today().date()
 
-    # Bandeau gauche modifiable
+    # --- CONFIGURATION DU BANDEAU GAUCHE MODIFIABLE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
@@ -155,7 +153,12 @@ else:
     side_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, key="side_df")
     side_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite, key="side_g")
     side_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps, key="side_dep")
-    side_type = st.sidebar.selectbox("Activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"], index=["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"].index(s_type), key="side_t")
+    
+    # 🌟 SÉCURISATION DU SÉLECTEUR : index dynamique blindé contre le plantage si la valeur lue est invalide
+    liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
+    idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
+    side_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut, key="side_t")
+    
     side_cavites = st.sidebar.text_area("Cavités :", value=s_cavites, key="side_c")
     
     st.sidebar.write("---")
@@ -176,7 +179,7 @@ else:
         st.session_state["id_sortie_active"] = None
         st.rerun()
 
-    # Zone centrale linéaire
+    # --- ZONE CENTRALE ---
     st.title(f"📝 Gestion : {s_nom}")
     
     st.markdown("### 👤 Ajouter une personne présente sur la sortie")
