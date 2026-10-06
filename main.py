@@ -141,11 +141,12 @@ else:
         date_deb_formatee = s_ddeb
         date_fin_formatee = s_dfin
 
-    # --- BANDEAU GAUCHE MODIFIABLE ---
+    # --- BANDEAU GAUCHE FIXE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
     
+    # 🌟 MODE LECTURE (Texte propre)
     if not st.session_state["mode_edition_bandeau"]:
         st.sidebar.subheader("📋 Caractéristiques validées :")
         st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
@@ -160,6 +161,7 @@ else:
             st.session_state["mode_edition_bandeau"] = True
             st.rerun()
             
+    # 🌟 MODE ÉDITION (Bouton direct réactif et linéaire)
     else:
         st.sidebar.subheader("⚙️ Modification des infos :")
         try:
@@ -169,22 +171,20 @@ else:
             d_deb_obj = datetime.today().date()
             d_fin_obj = datetime.today().date()
             
-        with st.sidebar.form("formulaire_lateral_modification"):
-            edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom)
-            edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY")
-            edit_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, format="DD/MM/YYYY")
-            edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "")
-            edit_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps if s_deps != "Non renseigné" else "")
-            
-            liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
-            idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
-            edit_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut)
-            edit_cavites = st.sidebar.text_area("Liste des cavités :", value=s_cavites if s_cavites != "Aucune" else "")
-            
-            # Actionneur direct du formulaire
-            bouton_sauver_barre = st.form_submit_button("💾 Valider les modifications")
+        edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom, key="ed_nom")
+        edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY", key="ed_ddeb")
+        edit_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, format="DD/MM/YYYY", key="ed_dfin")
+        edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "", key="ed_gite")
+        edit_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps if s_deps != "Non renseigné" else "", key="ed_deps")
         
-        # Execution de l'écriture en base en dehors du bouton de formulaire
+        liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
+        idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
+        edit_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut, key="ed_type")
+        edit_cavites = st.sidebar.text_area("Liste des cavités :", value=s_cavites if s_cavites != "Aucune" else "", key="ed_cav")
+        
+        st.sidebar.write("---")
+        bouton_sauver_barre = st.sidebar.button("💾 Valider les modifications", key="btn_save_sidebar")
+        
         if bouton_sauver_barre:
             if edit_nom:
                 conn = sqlite3.connect(DB_NAME)
