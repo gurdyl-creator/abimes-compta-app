@@ -61,6 +61,8 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
 
 if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
 if "id_sortie_active" not in st.session_state: st.session_state["id_sortie_active"] = None
+# Variable mémoire pour gérer l'interrupteur du mode édition du bandeau
+if "mode_edition_bandeau" not in st.session_state: st.session_state["mode_edition_bandeau"] = False
 
 st.set_page_config(page_title="ABIMES - Frais", page_icon="🦇", layout="centered")
 
@@ -145,44 +147,43 @@ else:
         date_deb_formatee = s_ddeb
         date_fin_formatee = s_dfin
 
-    # --- BANDEAU GAUCHE FIXE ---
+    # ==============================================================================
+    # --- CONSTRUTION DU BANDEAU GAUCHE AVEC LE BOUTON INTERRUPTEUR MODIFIABLE
+    # ==============================================================================
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
-    st.sidebar.subheader("📋 Caractéristiques validées :")
-    st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
-    st.sidebar.write(f"⏱️ **Dates :** du {date_deb_formatee} au {date_fin_formatee}")
-    st.sidebar.write(f"🏡 **Gîte :** {s_gite}")
-    st.sidebar.write(f"🗺️ **Département(s) :** {s_deps}")
-    st.sidebar.write(f"🧗 **Activité :** {s_type}")
-    st.sidebar.write(f"🕳️ **Cavités :**\n{s_cavites}")
-    st.sidebar.write("---")
     
-    if st.sidebar.button("🚪 Se déconnecter"):
-        st.session_state["statut_connexion"] = "Deconnecte"
-        st.session_state["id_sortie_active"] = None
-        st.rerun()
-
-    # Zone centrale
-    st.title(f"📝 Gestion terrain : {s_nom}")
-    tab_membres, tab_modif, tab_frais = st.tabs(["👤 Les Participants", "⚙️ Modifier la sortie", "💰 Saisie des Dépenses"])
-    
-    with tab_membres:
-        st.subheader("👥 Ajouter une personne présente")
-        with st.form("formulaire_participants_final"):
-            nom_part = st.text_input("Nom et Prénom (Obligatoire) :", placeholder="Format attendu : Prénom N")
-            email_part = st.text_input("Adresse Email (Optionnel) :")
-            st.write("---")
-            statut = st.selectbox("Statut Spéléo :", ["Spéléo Membre du club", "Débutant", "Spéléo Non membre du club", "Non membre du club"])
-            genre = st.radio("Genre (Optionnel) :", ["Homme", "Femme"], horizontal=True, index=None)
-            age = st.radio("Tranche d'âge (Optionnel) :", ["Sénior", "Jeune moins de 26 ans"], horizontal=True, index=None)
-            st.write("---")
-            voiture = st.checkbox("🚗 Propose sa voiture pour la sortie")
-            st.write("🔧 *Options Débutant (Prises en compte uniquement si le statut est 'Débutant')*")
-            assurance = st.selectbox("🛡️ Assurance Débutant :", ["Aucune", "Assurance 2 jours", "Assurance 5 jours"])
-            matos = st.checkbox("🎒 Prêt de matériel débutant club")
-            bouton_participant = st.form_submit_button("💾 Enregistrer le participant")
+    # ÉCRAN 1 : MODE LECTURE (S'affiche par défaut)
+    if not st.session_state["mode_edition_bandeau"]:
+        st.sidebar.subheader("📋 Caractéristiques validées :")
+        st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
+        st.sidebar.write(f"⏱️ **Dates :** du {date_deb_formatee} au {date_fin_formatee}")
+        st.sidebar.write(f"🏡 **Gîte :** {s_gite}")
+        st.sidebar.write(f"🗺️ **Département(s) :** {s_deps}")
+        st.sidebar.write(f"🧗 **Activité :** {s_type}")
+        st.sidebar.write(f"🕳️ **Cavités :**\n{s_cavites}")
+        st.sidebar.write("---")
+        
+        # Le bouton d'ouverture du mode modification
+        if st.sidebar.button("⚙️ Modifier les infos", key="btn_ouvrir_edition"):
+            st.session_state["mode_edition_bandeau"] = True
+            st.rerun()
             
-        # 🌟 ALIGNEMENT DROIT : Placé de façon stricte en ligne droite sans décalage
-        if bouton_participant and nom_part:
-            genre_texte = str(genre) if genre is not None else "Non spécifié"
+    # ÉCRAN 2 : MODE ÉDITION EN DIRECT (S'ouvre au clic)
+    else:
+        st.sidebar.subheader("⚙️ Modification des infos :")
+        
+        try:
+            d_deb_obj = datetime.strptime(s_ddeb, "%Y-%m-%d").date()
+            d_fin_obj = datetime.strptime(s_dfin, "%Y-%m-%d").date()
+        except:
+            d_deb_obj = datetime.today().date()
+            d_fin_obj = datetime.today().date()
+            
+        edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom, key="ed_nom")
+        edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY", key="ed_ddeb")
+        edit_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, format="DD/MM/YYYY", key="ed_dfin")
+        edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "", key="ed_gite")
+        edit_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps if s_deps != "Non renseigné" else "", key="ed_deps")
+        
