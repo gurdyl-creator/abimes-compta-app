@@ -65,9 +65,7 @@ if "mode_edition_bandeau" not in st.session_state: st.session_state["mode_editio
 
 st.set_page_config(page_title="ABIMES - Frais", page_icon="🦇", layout="centered")
 
-# ==============================================================================
-# --- ÉCRAN D'ACCUEIL (DÉCONNECTÉ)
-# ==============================================================================
+# --- ÉCRAN D'ACCUEIL ---
 if st.session_state["statut_connexion"] == "Deconnecte":
     st.title("🦇 Club ABIMES - Gestion des Frais")
     onglet_creer, onglet_connexion = st.tabs(["🆕 Créer une sortie", "🔑 Connexion"])
@@ -119,9 +117,7 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 st.rerun()
             else: st.error("❌ Identifiants incorrects.")
 
-# ==============================================================================
-# --- ÉCRANS INTÉRIEURS (CONNECTÉ)
-# ==============================================================================
+# --- ÉCRANS INTÉRIEURS ---
 else:
     id_sortie = st.session_state["id_sortie_active"]
     
@@ -131,13 +127,14 @@ else:
     res_s = c.fetchone()
     conn.close()
     
-    s_nom = res_s if res_s else id_sortie
-    s_ddeb = res_s if res_s else str(datetime.today().date())
-    s_dfin = res_s if res_s else str(datetime.today().date())
-    s_gite = res_s if res_s and res_s else "Non renseigné"
-    s_deps = res_s if res_s and res_s else "Non renseigné"
-    s_cavites = res_s if res_s and res_s else "Aucune"
-    s_type = res_s if res_s and res_s else "classique"
+    # 🌟 CORRECTION DE L'INDEXATION : Lecture cellule par cellule pour éviter l'affichage de listes
+    s_nom = res_s[0] if res_s else id_sortie
+    s_ddeb = res_s[1] if res_s else str(datetime.today().date())
+    s_dfin = res_s[2] if res_s else str(datetime.today().date())
+    s_gite = res_s[3] if res_s and res_s[3] else "Non renseigné"
+    s_deps = res_s[4] if res_s and res_s[4] else "Non renseigné"
+    s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
+    s_type = res_s[6] if res_s and res_s[6] else "classique"
 
     try:
         date_deb_formatee = datetime.strptime(s_ddeb, "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -146,12 +143,11 @@ else:
         date_deb_formatee = s_ddeb
         date_fin_formatee = s_dfin
 
-    # --- BANDEAU GAUCHE COHÉRENT ---
+    # --- BANDEAU GAUCHE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
     
-    # 🌟 MODE LECTURE (Texte propre)
     if not st.session_state["mode_edition_bandeau"]:
         st.sidebar.subheader("📋 Caractéristiques validées :")
         st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
@@ -166,10 +162,8 @@ else:
             st.session_state["mode_edition_bandeau"] = True
             st.rerun()
             
-    # 🌟 MODE ÉDITION (Formulaire étanche et sécurisé pour forcer la validation)
     else:
         st.sidebar.subheader("⚙️ Modification des infos :")
-        
         try:
             d_deb_obj = datetime.strptime(s_ddeb, "%Y-%m-%d").date()
             d_fin_obj = datetime.strptime(s_dfin, "%Y-%m-%d").date()
@@ -177,7 +171,6 @@ else:
             d_deb_obj = datetime.today().date()
             d_fin_obj = datetime.today().date()
             
-        # Utilisation d'un sidebar.form pour figer les variables jusqu'à l'écriture finale
         with st.sidebar.form("formulaire_lateral_modification"):
             edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom)
             edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY")
@@ -188,3 +181,11 @@ else:
             liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
             idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
             edit_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut)
+            edit_cavites = st.sidebar.text_area("Liste des cavités :", value=s_cavites if s_cavites != "Aucune" else "")
+            
+            bouton_sauver_barre = st.form_submit_button("💾 Valider les modifications")
+        
+        if bouton_sauver_barre:
+            if edit_nom:
+                conn = sqlite3.connect(DB_NAME)
+                c = conn.cursor()
