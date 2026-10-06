@@ -95,7 +95,6 @@ if st.session_state["statut_connexion"] == "Deconnecte":
                 conn.commit()
                 st.success("🎉 Votre espace de sortie a été créé avec succès !")
                 st.info(f"👉 **Notez précieusement vos accès de connexion :**\n\n➡️ **N° de Sortie :** `{id_sortie}`\n\n➡️ **Code PIN (6 chiffres) :** `{code_pin}`")
-                
                 ok_mail, erreur = envoyer_email_acces(email_responsable, id_sortie, code_pin, nom_sortie)
                 if not ok_mail:
                     st.warning(f"⚠️ **Note : L'e-mail n'a pas pu partir automatiquement ({erreur}).** Pas d'inquiétude, utilisez les codes écrits ci-dessus pour vous connecter.")
@@ -127,7 +126,6 @@ else:
     res_s = c.fetchone()
     conn.close()
     
-    # 🌟 CORRECTION DE L'INDEXATION : Lecture cellule par cellule pour éviter l'affichage de listes
     s_nom = res_s[0] if res_s else id_sortie
     s_ddeb = res_s[1] if res_s else str(datetime.today().date())
     s_dfin = res_s[2] if res_s else str(datetime.today().date())
@@ -143,7 +141,7 @@ else:
         date_deb_formatee = s_ddeb
         date_fin_formatee = s_dfin
 
-    # --- BANDEAU GAUCHE ---
+    # --- BANDEAU GAUCHE MODIFIABLE ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
@@ -183,8 +181,10 @@ else:
             edit_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut)
             edit_cavites = st.sidebar.text_area("Liste des cavités :", value=s_cavites if s_cavites != "Aucune" else "")
             
+            # Actionneur direct du formulaire
             bouton_sauver_barre = st.form_submit_button("💾 Valider les modifications")
         
+        # Execution de l'écriture en base en dehors du bouton de formulaire
         if bouton_sauver_barre:
             if edit_nom:
                 conn = sqlite3.connect(DB_NAME)
