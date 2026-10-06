@@ -77,11 +77,8 @@ if st.session_state["statut_connexion"] == "Deconnecte":
             email_responsable = st.text_input("Adresse email du responsable (Obligatoire) :")
             st.write("---")
             col1, col2 = st.columns(2)
-            with col1: 
-                # Format d'affichage imposé en français sur le calendrier initial
-                date_debut = st.date_input("Date de début :", format="DD/MM/YYYY")
-            with col2: 
-                date_fin = st.date_input("Date de fin :", format="DD/MM/YYYY")
+            with col1: date_debut = st.date_input("Date de début :", format="DD/MM/YYYY")
+            with col2: date_fin = st.date_input("Date de fin :", format="DD/MM/YYYY")
             type_activite = st.selectbox("Type d'activité :", ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"])
             lieu_gite = st.text_input("Lieu du gîte :")
             departements = st.text_input("N° Département(s) :")
@@ -141,7 +138,6 @@ else:
     s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
     s_type = res_s[6] if res_s and res_s[6] else "classique"
 
-    # Conversion propre pour le bandeau gauche (jj/mm/aaaa)
     try:
         date_deb_formatee = datetime.strptime(s_ddeb, "%Y-%m-%d").strftime("%d/%m/%Y")
         date_fin_formatee = datetime.strptime(s_dfin, "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -150,7 +146,7 @@ else:
         date_fin_formatee = s_dfin
 
     # --- BANDEAU GAUCHE FIXE ---
-    st.sidebar.title("替代 ABIMES")
+    st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
     st.sidebar.subheader("📋 Caractéristiques validées :")
@@ -187,4 +183,6 @@ else:
             matos = st.checkbox("🎒 Prêt de matériel débutant club")
             bouton_participant = st.form_submit_button("💾 Enregistrer le participant")
             
+        # 🌟 ALIGNEMENT DROIT : Placé de façon stricte en ligne droite sans décalage
         if bouton_participant and nom_part:
+            genre_texte = str(genre) if genre is not None else "Non spécifié"
