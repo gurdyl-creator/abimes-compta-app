@@ -61,7 +61,6 @@ def envoyer_email_acces(email_destinataire, id_sortie, code_pin, nom_sortie):
 
 if "statut_connexion" not in st.session_state: st.session_state["statut_connexion"] = "Deconnecte"
 if "id_sortie_active" not in st.session_state: st.session_state["id_sortie_active"] = None
-# Variable mémoire pour gérer l'interrupteur du mode édition du bandeau
 if "mode_edition_bandeau" not in st.session_state: st.session_state["mode_edition_bandeau"] = False
 
 st.set_page_config(page_title="ABIMES - Frais", page_icon="🦇", layout="centered")
@@ -132,13 +131,13 @@ else:
     res_s = c.fetchone()
     conn.close()
     
-    s_nom = res_s[0] if res_s else id_sortie
-    s_ddeb = res_s[1] if res_s else str(datetime.today().date())
-    s_dfin = res_s[2] if res_s else str(datetime.today().date())
-    s_gite = res_s[3] if res_s and res_s[3] else "Non renseigné"
-    s_deps = res_s[4] if res_s and res_s[4] else "Non renseigné"
-    s_cavites = res_s[5] if res_s and res_s[5] else "Aucune"
-    s_type = res_s[6] if res_s and res_s[6] else "classique"
+    s_nom = res_s if res_s else id_sortie
+    s_ddeb = res_s if res_s else str(datetime.today().date())
+    s_dfin = res_s if res_s else str(datetime.today().date())
+    s_gite = res_s if res_s and res_s else "Non renseigné"
+    s_deps = res_s if res_s and res_s else "Non renseigné"
+    s_cavites = res_s if res_s and res_s else "Aucune"
+    s_type = res_s if res_s and res_s else "classique"
 
     try:
         date_deb_formatee = datetime.strptime(s_ddeb, "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -147,14 +146,12 @@ else:
         date_deb_formatee = s_ddeb
         date_fin_formatee = s_dfin
 
-    # ==============================================================================
-    # --- CONSTRUTION DU BANDEAU GAUCHE AVEC LE BOUTON INTERRUPTEUR MODIFIABLE
-    # ==============================================================================
+    # --- BANDEAU GAUCHE COHÉRENT ---
     st.sidebar.title("🦇 Club ABIMES")
     st.sidebar.write(f"📅 **N° Sortie :** `{id_sortie}`")
     st.sidebar.write("---")
     
-    # ÉCRAN 1 : MODE LECTURE (S'affiche par défaut)
+    # 🌟 MODE LECTURE (Texte propre)
     if not st.session_state["mode_edition_bandeau"]:
         st.sidebar.subheader("📋 Caractéristiques validées :")
         st.sidebar.write(f"🏷️ **Nom :** {s_nom}")
@@ -165,12 +162,11 @@ else:
         st.sidebar.write(f"🕳️ **Cavités :**\n{s_cavites}")
         st.sidebar.write("---")
         
-        # Le bouton d'ouverture du mode modification
         if st.sidebar.button("⚙️ Modifier les infos", key="btn_ouvrir_edition"):
             st.session_state["mode_edition_bandeau"] = True
             st.rerun()
             
-    # ÉCRAN 2 : MODE ÉDITION EN DIRECT (S'ouvre au clic)
+    # 🌟 MODE ÉDITION (Formulaire étanche et sécurisé pour forcer la validation)
     else:
         st.sidebar.subheader("⚙️ Modification des infos :")
         
@@ -181,9 +177,14 @@ else:
             d_deb_obj = datetime.today().date()
             d_fin_obj = datetime.today().date()
             
-        edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom, key="ed_nom")
-        edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY", key="ed_ddeb")
-        edit_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, format="DD/MM/YYYY", key="ed_dfin")
-        edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "", key="ed_gite")
-        edit_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps if s_deps != "Non renseigné" else "", key="ed_deps")
-        
+        # Utilisation d'un sidebar.form pour figer les variables jusqu'à l'écriture finale
+        with st.sidebar.form("formulaire_lateral_modification"):
+            edit_nom = st.sidebar.text_input("Nom de la sortie :", value=s_nom)
+            edit_ddeb = st.sidebar.date_input("Date de début :", value=d_deb_obj, format="DD/MM/YYYY")
+            edit_dfin = st.sidebar.date_input("Date de fin :", value=d_fin_obj, format="DD/MM/YYYY")
+            edit_gite = st.sidebar.text_input("Lieu du gîte :", value=s_gite if s_gite != "Non renseigné" else "")
+            edit_deps = st.sidebar.text_input("N° Département(s) :", value=s_deps if s_deps != "Non renseigné" else "")
+            
+            liste_types = ["classique", "explo", "formation/entrainement", "plongée", "secours", "scientifique", "canyon", "réunion"]
+            idx_defaut = liste_types.index(s_type) if s_type in liste_types else 0
+            edit_type = st.sidebar.selectbox("Activité :", liste_types, index=idx_defaut)
